@@ -14,6 +14,12 @@ struct player {
 };
 
 
+struct cheese {
+    int x;
+    int y;
+};
+
+
 void print_map(char **map, int rows, int cols)
 {
     for (int y = 0; y < rows-1; y++)
@@ -154,25 +160,59 @@ void move_enemy(char **map, struct player *enemy_person, int px, int py)
     }
     //для крысы
     else if (enemy_person->role == 'r') {
-        int r = rand() % 2; //[0; 1]
-        //X побег
-        if (r && enemy_person->y != py) {
-            if ((enemy_person->x <= px) && (map[enemy_person->y][(enemy_person->x)-1] != '%' &&
-             map[enemy_person->y][(enemy_person->x)-1] != 'c'))
-                (enemy_person->x)--;
-            else if ((enemy_person->x >= px) && (map[enemy_person->y][(enemy_person->x)+1] != '%' &&
-             map[enemy_person->y][(enemy_person->x)+1] != 'c'))
-                (enemy_person->x)++;
-        }
-        //Y побег
-        else {
-            if ((enemy_person->y <= py) && (map[(enemy_person->y)-1][enemy_person->x] != '%' &&
-             map[(enemy_person->y)-1][enemy_person->x] != 'c'))
-                (enemy_person->y)--;
-            else if ((enemy_person->y >= py) && (map[(enemy_person->y)+1][enemy_person->x] != '%' &&
-             map[(enemy_person->y)+1][enemy_person->x] != 'c'))
-                (enemy_person->y)++;
-        }
+        bool up_not_board = (map[(enemy_person->y)+1][enemy_person->x] != '%') ? true : false;
+        bool down_not_board = (map[(enemy_person->y)-1][enemy_person->x] != '%') ? true : false;
+        bool left_not_board = (map[enemy_person->y][(enemy_person->x)+1] != '%') ? true : false;
+        bool right_not_board = (map[enemy_person->y][(enemy_person->x)-1] != '%') ? true : false;
+        
+        double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
+        double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
+        double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
+        double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
+        
+        //усл. вверх
+        bool up_less_down = (down_not_board == true) ?
+         (up_distance_to_rat <= down_distance_to_rat) : true;
+        bool up_less_left = (left_not_board == true) ? 
+         (up_distance_to_rat <= left_distance_to_rat) : true;
+        bool up_less_right = (right_not_board == true) ?
+         (up_distance_to_rat <= right_distance_to_rat) : true;
+        //усл. вниз
+        bool down_less_up = (up_not_board == true) ?
+         (down_distance_to_rat <= up_distance_to_rat) : true;
+        bool down_less_left = (left_not_board == true) ?
+         (down_distance_to_rat <= left_distance_to_rat) : true;
+        bool down_less_right = (right_not_board == true) ?
+         (down_distance_to_rat <= right_distance_to_rat) : true;
+        //усл. влево
+        bool left_less_up = (up_not_board == true) ?
+         (left_distance_to_rat <= up_distance_to_rat) : true;
+        bool left_less_down = (down_not_board == true) ?
+         (left_distance_to_rat <= down_distance_to_rat) : true;
+        bool left_less_right = (right_not_board == true) ?
+         (left_distance_to_rat <= right_distance_to_rat) : true;
+        //усл.вправо
+        bool right_less_up = (up_not_board == true) ?
+         (right_distance_to_rat <= up_distance_to_rat) : true;
+        bool right_less_down = (down_not_board == true) ?
+         (right_distance_to_rat <= down_distance_to_rat) : true;
+        bool right_less_left = (right_not_board == true) ?
+         (right_distance_to_rat <= left_distance_to_rat) : true;
+     
+     
+        
+        //вверх
+        if ((up_not_board == true) && (up_less_down && up_less_left && up_less_right))
+            enemy_person->y++;
+        //вниз
+        else if ((down_not_board == true) && (down_less_up && down_less_left && down_less_right))
+            enemy_person->y--;
+        //влево
+        else if ((left_not_board == true) && (left_less_up && left_less_down && left_less_right))
+            enemy_person->x++;
+        //вправо
+        else if ((right_not_board == true) && (right_less_up && right_less_down && right_less_left))
+            enemy_person->x--;
     }
     
     mvaddch(enemy_person->last_y, enemy_person->last_x, ' '); //clear last position
@@ -222,6 +262,7 @@ void spawn_cheese(char **map, int number, int rows, int cols)
     int r_x, r_y;
     for (int i = 0; i < number; i++) {
         get_random_xy_in_void_place(map, rows, cols, &r_x, &r_y);
+        
         map[r_y][r_x] = '*';
     }
 
@@ -229,16 +270,26 @@ void spawn_cheese(char **map, int number, int rows, int cols)
 
 
 void release_map(char **map, int rows, int cols, struct player *my_player,
-struct player *enemy_list, int enemy_number, int balls_to_next_lvl)
+struct player *enemy_list, struct cheese *cheese_list,
+int enemy_number, int balls_to_next_lvl)
 {
-    char enemy_role = ((my_player->role == '1') ? 'r' : 'c');
+    char enemy_role = ((my_player->role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].role = enemy_role;
     
     //карта
     clear_display(map, rows, cols);
     drawing_map(map, rows, cols);
-    spawn_cheese(map, balls_to_next_lvl, rows, cols);
+    //spawn cheese
+    for (int i = 0; i < 5; i++)//!!
+    {
+        int r_x, r_y;
+        get_random_xy_in_void_place(map, rows, cols, &r_x, &r_y);
+        cheese_list[i].x = r_x;
+        cheese_list[i].y = r_y;
+        map[cheese_list[i].y][cheese_list[i].x] = '*';
+    }
+    
     print_map(map, rows, cols);
     
     //спавн    
@@ -288,6 +339,9 @@ int main()
     //противники
     int enemy_number = 1;
     struct player enemy_list[10];//!!
+    //сыр
+    struct cheese cheese_list[5];
+    
     
     
     //масштаб карты
@@ -316,14 +370,14 @@ int main()
     my_player.role = ((c == '1') ? 'c' : 'r');///*
     
     //назначение роли противникам(которая противоположна роли игрока)
-    char enemy_role = ((my_player.role == '1') ? 'r' : 'c');
+    char enemy_role = ((my_player.role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].role = enemy_role;
     
     
     //создание карты
     release_map(map, rows, cols, &my_player,
-            enemy_list, enemy_number, balls_to_next_lvl);
+            enemy_list, cheese_list, enemy_number, balls_to_next_lvl);
     
     
     
@@ -346,7 +400,7 @@ int main()
             enemy_number++;
             my_balls = 0;
             release_map(map, rows, cols, &my_player,
-            enemy_list, enemy_number, balls_to_next_lvl);
+            enemy_list, cheese_list, enemy_number, balls_to_next_lvl);
             get_random_xy_in_void_place(map, rows, cols, &x_lvl_point, &y_lvl_point);            
          }
          
