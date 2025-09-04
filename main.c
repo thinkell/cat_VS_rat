@@ -58,73 +58,60 @@ void clear_display(char **map, int rows, int cols)
 
 void move_me(char **map, struct player *my_player, const int *my_key_input, int *my_cheese)
 {
-    int px = my_player->x;
-    int py = my_player->y;
-    int my_role = my_player->role;
-    int last_x = my_player->last_x;
-    int last_y = my_player->last_y;
-    
-    last_x = px, last_y = py;
+    my_player->last_x = my_player->x, my_player->last_y = my_player->y;
     if (*my_key_input == KEY_UP)
-        py--;
+        my_player->y--;
     else if (*my_key_input == KEY_DOWN)
-        py++;
+        my_player->y++;
     else if (*my_key_input == KEY_LEFT)
-        px--;
+        my_player->x--;
     else if (*my_key_input == KEY_RIGHT)
-        px++;
+        my_player->x++;
     
  
     //если шаг на стену/границу - возвращение персонажа на исходную позицию
-    if (map[py][px] == '%' || (my_role == 'c' && map[py][px] == '#')) {
-        px = last_x;
-        py = last_y;    
+    if (map[my_player->y][my_player->x] == '%' || (my_player->role == 'c' &&
+     map[my_player->y][my_player->x] == '#')) {
+        my_player->x = my_player->last_x;
+        my_player->y = my_player->last_y;    
     } //только крыса может проедать стены(но не границы)
     
     //съесть сыр
-    if (map[py][px] == '*')
+    if (map[my_player->y][my_player->x] == '*')
         (*my_cheese)++;
     
-    mvaddch(last_y, last_x, ' '); //clear last position
-    map[last_y][last_x] = ' ';
-    mvaddch(py, px, my_role); //print new position
-    map[py][px] = my_role;
-    
-    my_player->x = px;
-    my_player->y = py;
-    my_player->role = my_role;
-    my_player->last_x = last_x;
-    my_player->last_y = last_y;
+    mvaddch(my_player->last_y, my_player->last_x, ' '); //clear last position
+    map[my_player->last_y][my_player->last_x] = ' ';
+    mvaddch(my_player->y, my_player->x, my_player->role); //print new position
+    map[my_player->y][my_player->x] = my_player->role;
 }
 
 
 void move_enemy(char **map, struct player *enemy_person, int px, int py)
 {
-    int ex = enemy_person->x;
-    int ey = enemy_person->y;
-    int last_x = enemy_person->last_x;
-    int last_y = enemy_person->last_y;
-    char enemy_role = enemy_person->role;
-    
-    last_x = ex, last_y = ey;
+    enemy_person->last_x = enemy_person->x, enemy_person->last_y = enemy_person->y;
     
     
     // для кота
-    if (enemy_role == 'c') {
-        bool up_not_board = (map[(ey)-1][ex] == ' ' || map[(ey)-1][ex] == 'r') ? true : false;
-        bool down_not_board = (map[(ey)+1][ex] == ' ' || map[(ey)+1][ex] == 'r') ? true : false;
-        bool left_not_board = (map[ey][(ex)-1] == ' ' || map[ey][(ex)-1] == 'r') ? true : false;
-        bool right_not_board = (map[ey][(ex)+1] == ' ' || map[ey][(ex)+1] == 'r') ? true : false;
+    if (enemy_person->role == 'c') {
+        bool up_not_board = (map[(enemy_person->y)-1][enemy_person->x] == ' ' ||
+         map[(enemy_person->y)-1][enemy_person->x] == 'r') ? true : false;
+        bool down_not_board = (map[(enemy_person->y)+1][enemy_person->x] == ' ' ||
+         map[(enemy_person->y)+1][enemy_person->x] == 'r') ? true : false;
+        bool left_not_board = (map[enemy_person->y][(enemy_person->x)-1] == ' ' ||
+         map[enemy_person->y][(enemy_person->x)-1] == 'r') ? true : false;
+        bool right_not_board = (map[enemy_person->y][(enemy_person->x)+1] == ' ' ||
+         map[enemy_person->y][(enemy_person->x)+1] == 'r') ? true : false;
         
-        double up_distance_to_rat = hypot(px-(ex), py-((ey)-1));
-        double down_distance_to_rat = hypot(px-(ex), py-((ey)+1));
-        double left_distance_to_rat = hypot(px-((ex)-1), py-(ey));
-        double right_distance_to_rat = hypot(px-((ex)+1), py-(ey));
+        double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
+        double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
+        double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
+        double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
         
         //усл. вверх
         bool up_less_down = (down_not_board == true) ?
          (up_distance_to_rat <= down_distance_to_rat) : true;
-        bool up_less_left = (left_not_board == true) ?
+        bool up_less_left = (left_not_board == true) ? 
          (up_distance_to_rat <= left_distance_to_rat) : true;
         bool up_less_right = (right_not_board == true) ?
          (up_distance_to_rat <= right_distance_to_rat) : true;
@@ -154,47 +141,45 @@ void move_enemy(char **map, struct player *enemy_person, int px, int py)
         
         //вверх
         if ((up_not_board == true) && (up_less_down && up_less_left && up_less_right))
-            ey--;
+            enemy_person->y--;
         //вниз
         else if ((down_not_board == true) && (down_less_up && down_less_left && down_less_right))
-            ey++;
+            enemy_person->y++;
         //влево
         else if ((left_not_board == true) && (left_less_up && left_less_down && left_less_right))
-            ex--;
+            enemy_person->x--;
         //вправо
         else if ((right_not_board == true) && (right_less_up && right_less_down && right_less_left))
-            ex++;
+            enemy_person->x++;
     }
     //для крысы
-    else if (enemy_role == 'r') {
+    else if (enemy_person->role == 'r') {
         int r = rand() % 2; //[0; 1]
         //X побег
-        if (r && ey != py) {
-            if ((ex <= px) && (map[ey][(ex)-1] != '%' && map[ey][(ex)-1] != 'c'))
-                (ex)--;
-            else if ((ex >= px) && (map[ey][(ex)+1] != '%' && map[ey][(ex)+1] != 'c'))
-                (ex)++;
+        if (r && enemy_person->y != py) {
+            if ((enemy_person->x <= px) && (map[enemy_person->y][(enemy_person->x)-1] != '%' &&
+             map[enemy_person->y][(enemy_person->x)-1] != 'c'))
+                (enemy_person->x)--;
+            else if ((enemy_person->x >= px) && (map[enemy_person->y][(enemy_person->x)+1] != '%' &&
+             map[enemy_person->y][(enemy_person->x)+1] != 'c'))
+                (enemy_person->x)++;
         }
         //Y побег
         else {
-            if ((ey <= py) && (map[(ey)-1][ex] != '%' && map[(ey)-1][ex] != 'c'))
-                (ey)--;
-            else if ((ey >= py) && (map[(ey)+1][ex] != '%' && map[(ey)+1][ex] != 'c'))
-                (ey)++;
+            if ((enemy_person->y <= py) && (map[(enemy_person->y)-1][enemy_person->x] != '%' &&
+             map[(enemy_person->y)-1][enemy_person->x] != 'c'))
+                (enemy_person->y)--;
+            else if ((enemy_person->y >= py) && (map[(enemy_person->y)+1][enemy_person->x] != '%' &&
+             map[(enemy_person->y)+1][enemy_person->x] != 'c'))
+                (enemy_person->y)++;
         }
     }
     
-    mvaddch(last_y, last_x, ' '); //clear last position
-    map[last_y][last_x] = ' ';
+    mvaddch(enemy_person->last_y, enemy_person->last_x, ' '); //clear last position
+    map[enemy_person->last_y][enemy_person->last_x] = ' ';
     
-    mvaddch(ey, ex, enemy_role); //print new position
-    map[ey][ex] = enemy_role;
-    
-    enemy_person->x = ex;
-    enemy_person->y = ey;
-    enemy_person->last_x = last_x;
-    enemy_person->last_y = last_y;
-    enemy_person->role = enemy_role;
+    mvaddch(enemy_person->y, enemy_person->x, enemy_person->role); //print new position
+    map[enemy_person->y][enemy_person->x] = enemy_person->role;
 }
 
 
@@ -264,6 +249,7 @@ struct player *enemy_list, int enemy_number, int balls_to_next_lvl)
          //my_player->x = rand() % cols;
          //my_player->y = rand() % rows;
     } while (map[my_player->y][my_player->x] != ' ');
+    map[my_player->y][my_player->x] = my_player->role;
     
     
     for (int i = 0; i < enemy_number; i++) {
@@ -355,7 +341,7 @@ int main()
         //переход на следующий уровень
         if (
          my_player.x == x_lvl_point && my_player.y == y_lvl_point
-         && my_balls == balls_to_next_lvl) {
+         || my_balls == balls_to_next_lvl) {
             my_lvl++;
             enemy_number++;
             my_balls = 0;
