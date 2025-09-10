@@ -17,6 +17,9 @@ struct player {
 struct cheese {
     int x;
     int y;
+    double distance_to_rat;
+    double distance_to_cat;
+    bool activ;
 };
 
 
@@ -93,126 +96,135 @@ void move_me(char **map, struct player *my_player, const int *my_key_input, int 
 }
 
 
-void move_enemy(char **map, struct player *enemy_person, int px, int py)
+void calculate_coords_enemy(char **map, struct player *enemy_person, int px, int py, int role)
+{
+    /*role:
+    1 - hunt (for cat)
+    2 - run away (for rat)
+    3 - go to cheese (for rat)*/
+    int k_route = (role == 2) ? -1 : 1;
+    
+    bool up_not_board, down_not_board, left_not_board, right_not_board;
+    if (role == 1) {
+        up_not_board = (map[(enemy_person->y)-1][enemy_person->x] == ' ' ||
+         map[(enemy_person->y)-1][enemy_person->x] == 'r') ? true : false;
+        down_not_board = (map[(enemy_person->y)+1][enemy_person->x] == ' ' ||
+         map[(enemy_person->y)+1][enemy_person->x] == 'r') ? true : false;
+        left_not_board = (map[enemy_person->y][(enemy_person->x)-1] == ' ' ||
+         map[enemy_person->y][(enemy_person->x)-1] == 'r') ? true : false;
+        right_not_board = (map[enemy_person->y][(enemy_person->x)+1] == ' ' ||
+         map[enemy_person->y][(enemy_person->x)+1] == 'r') ? true : false;
+    }
+    else if (role == 2 || role == 3) {
+        up_not_board = (map[(enemy_person->y)-k_route][enemy_person->x] != '%') ? true : false;
+        down_not_board = (map[(enemy_person->y)+k_route][enemy_person->x] != '%') ? true : false;
+        left_not_board = (map[enemy_person->y][(enemy_person->x)-k_route] != '%') ? true : false;
+        right_not_board = (map[enemy_person->y][(enemy_person->x)+k_route] != '%') ? true : false;
+    }
+    
+    
+    
+    double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
+    double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
+    double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
+    double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
+
+    //усл. вверх
+    bool up_less_down = (down_not_board == true) ?
+     (up_distance_to_rat <= down_distance_to_rat) : true;
+    bool up_less_left = (left_not_board == true) ? 
+     (up_distance_to_rat <= left_distance_to_rat) : true;
+    bool up_less_right = (right_not_board == true) ?
+     (up_distance_to_rat <= right_distance_to_rat) : true;
+    //усл. вниз
+    bool down_less_up = (up_not_board == true) ?
+     (down_distance_to_rat <= up_distance_to_rat) : true;
+    bool down_less_left = (left_not_board == true) ?
+     (down_distance_to_rat <= left_distance_to_rat) : true;
+    bool down_less_right = (right_not_board == true) ?
+     (down_distance_to_rat <= right_distance_to_rat) : true;
+    //усл. влево
+    bool left_less_up = (up_not_board == true) ?
+     (left_distance_to_rat <= up_distance_to_rat) : true;
+    bool left_less_down = (down_not_board == true) ?
+     (left_distance_to_rat <= down_distance_to_rat) : true;
+    bool left_less_right = (right_not_board == true) ?
+     (left_distance_to_rat <= right_distance_to_rat) : true;
+    //усл.вправо
+    bool right_less_up = (up_not_board == true) ?
+     (right_distance_to_rat <= up_distance_to_rat) : true;
+    bool right_less_down = (down_not_board == true) ?
+     (right_distance_to_rat <= down_distance_to_rat) : true;
+    bool right_less_left = (right_not_board == true) ?
+     (right_distance_to_rat <= left_distance_to_rat) : true;
+
+
+
+    //вверх
+    if ((up_not_board == true) && (up_less_down && up_less_left && up_less_right))
+        enemy_person->y -= 1*k_route;
+    //вниз
+    else if ((down_not_board == true) && (down_less_up && down_less_left && down_less_right))
+        enemy_person->y += 1*k_route;
+    //влево
+    else if ((left_not_board == true) && (left_less_up && left_less_down && left_less_right))
+        enemy_person->x -= 1*k_route;
+    //вправо
+    else if ((right_not_board == true) && (right_less_up && right_less_down && right_less_left))
+        enemy_person->x += 1*k_route;
+}
+
+
+void move_enemy(char **map, struct player *enemy_person,
+struct cheese *cheese_list, int px, int py)
 {
     enemy_person->last_x = enemy_person->x, enemy_person->last_y = enemy_person->y;
     
     
     // для кота
     if (enemy_person->role == 'c') {
-        bool up_not_board = (map[(enemy_person->y)-1][enemy_person->x] == ' ' ||
-         map[(enemy_person->y)-1][enemy_person->x] == 'r') ? true : false;
-        bool down_not_board = (map[(enemy_person->y)+1][enemy_person->x] == ' ' ||
-         map[(enemy_person->y)+1][enemy_person->x] == 'r') ? true : false;
-        bool left_not_board = (map[enemy_person->y][(enemy_person->x)-1] == ' ' ||
-         map[enemy_person->y][(enemy_person->x)-1] == 'r') ? true : false;
-        bool right_not_board = (map[enemy_person->y][(enemy_person->x)+1] == ' ' ||
-         map[enemy_person->y][(enemy_person->x)+1] == 'r') ? true : false;
-        
-        double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
-        double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
-        double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
-        double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
-        
-        //усл. вверх
-        bool up_less_down = (down_not_board == true) ?
-         (up_distance_to_rat <= down_distance_to_rat) : true;
-        bool up_less_left = (left_not_board == true) ? 
-         (up_distance_to_rat <= left_distance_to_rat) : true;
-        bool up_less_right = (right_not_board == true) ?
-         (up_distance_to_rat <= right_distance_to_rat) : true;
-        //усл. вниз
-        bool down_less_up = (up_not_board == true) ?
-         (down_distance_to_rat <= up_distance_to_rat) : true;
-        bool down_less_left = (left_not_board == true) ?
-         (down_distance_to_rat <= left_distance_to_rat) : true;
-        bool down_less_right = (right_not_board == true) ?
-         (down_distance_to_rat <= right_distance_to_rat) : true;
-        //усл. влево
-        bool left_less_up = (up_not_board == true) ?
-         (left_distance_to_rat <= up_distance_to_rat) : true;
-        bool left_less_down = (down_not_board == true) ?
-         (left_distance_to_rat <= down_distance_to_rat) : true;
-        bool left_less_right = (right_not_board == true) ?
-         (left_distance_to_rat <= right_distance_to_rat) : true;
-        //усл.вправо
-        bool right_less_up = (up_not_board == true) ?
-         (right_distance_to_rat <= up_distance_to_rat) : true;
-        bool right_less_down = (down_not_board == true) ?
-         (right_distance_to_rat <= down_distance_to_rat) : true;
-        bool right_less_left = (right_not_board == true) ?
-         (right_distance_to_rat <= left_distance_to_rat) : true;
-     
-     
-        
-        //вверх
-        if ((up_not_board == true) && (up_less_down && up_less_left && up_less_right))
-            enemy_person->y--;
-        //вниз
-        else if ((down_not_board == true) && (down_less_up && down_less_left && down_less_right))
-            enemy_person->y++;
-        //влево
-        else if ((left_not_board == true) && (left_less_up && left_less_down && left_less_right))
-            enemy_person->x--;
-        //вправо
-        else if ((right_not_board == true) && (right_less_up && right_less_down && right_less_left))
-            enemy_person->x++;
+        calculate_coords_enemy(map, enemy_person, px, py, 1);
     }
     //для крысы
     else if (enemy_person->role == 'r') {
-        bool up_not_board = (map[(enemy_person->y)+1][enemy_person->x] != '%') ? true : false;
-        bool down_not_board = (map[(enemy_person->y)-1][enemy_person->x] != '%') ? true : false;
-        bool left_not_board = (map[enemy_person->y][(enemy_person->x)+1] != '%') ? true : false;
-        bool right_not_board = (map[enemy_person->y][(enemy_person->x)-1] != '%') ? true : false;
+        //определение расстояния до сыра
+        for (int i = 0; i < 5; i++) {
+            int ch_x = cheese_list[i].x;
+            int ch_y = cheese_list[i].y;
+            cheese_list[i].distance_to_rat = hypot(ch_x-enemy_person->x, ch_y-enemy_person->y);
+            cheese_list[i].distance_to_cat = hypot(ch_x-px, ch_y-py);
+        }
+        //сыр с минимальным расстоянием до крысы
+        //сортировка массива по возрастанию
+        for (int i = 0; i < 5; i++) {
+            int min_id = i;
+            for (int j = i+1; j < 5; j++)
+                if (((cheese_list[j].distance_to_rat < cheese_list[i].distance_to_rat) &&
+                cheese_list[j].activ == true) || 
+                (cheese_list[j].activ == true && cheese_list[i].activ == false))
+                    min_id = j;
+            struct cheese temp = cheese_list[i];
+            cheese_list[i] = cheese_list[min_id];
+            cheese_list[min_id] = temp;       
+        }
+        struct cheese near_cheese = cheese_list[0];
         
-        double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
-        double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
-        double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
-        double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
         
-        //усл. вверх
-        bool up_less_down = (down_not_board == true) ?
-         (up_distance_to_rat <= down_distance_to_rat) : true;
-        bool up_less_left = (left_not_board == true) ? 
-         (up_distance_to_rat <= left_distance_to_rat) : true;
-        bool up_less_right = (right_not_board == true) ?
-         (up_distance_to_rat <= right_distance_to_rat) : true;
-        //усл. вниз
-        bool down_less_up = (up_not_board == true) ?
-         (down_distance_to_rat <= up_distance_to_rat) : true;
-        bool down_less_left = (left_not_board == true) ?
-         (down_distance_to_rat <= left_distance_to_rat) : true;
-        bool down_less_right = (right_not_board == true) ?
-         (down_distance_to_rat <= right_distance_to_rat) : true;
-        //усл. влево
-        bool left_less_up = (up_not_board == true) ?
-         (left_distance_to_rat <= up_distance_to_rat) : true;
-        bool left_less_down = (down_not_board == true) ?
-         (left_distance_to_rat <= down_distance_to_rat) : true;
-        bool left_less_right = (right_not_board == true) ?
-         (left_distance_to_rat <= right_distance_to_rat) : true;
-        //усл.вправо
-        bool right_less_up = (up_not_board == true) ?
-         (right_distance_to_rat <= up_distance_to_rat) : true;
-        bool right_less_down = (down_not_board == true) ?
-         (right_distance_to_rat <= down_distance_to_rat) : true;
-        bool right_less_left = (right_not_board == true) ?
-         (right_distance_to_rat <= left_distance_to_rat) : true;
-     
-     
         
-        //вверх
-        if ((up_not_board == true) && (up_less_down && up_less_left && up_less_right))
-            enemy_person->y++;
-        //вниз
-        else if ((down_not_board == true) && (down_less_up && down_less_left && down_less_right))
-            enemy_person->y--;
-        //влево
-        else if ((left_not_board == true) && (left_less_up && left_less_down && left_less_right))
-            enemy_person->x++;
-        //вправо
-        else if ((right_not_board == true) && (right_less_up && right_less_down && right_less_left))
-            enemy_person->x--;
+       //определение куда идти: к сыру или от кота - в зависимости от расстояния
+       //идти к сыру
+       if (near_cheese.distance_to_rat < near_cheese.distance_to_cat) {
+            calculate_coords_enemy(map, enemy_person, near_cheese.x, near_cheese.y, 3);
+       }
+       //уходить от кота
+       else {
+            calculate_coords_enemy(map, enemy_person, px, py, 2);
+       }
+       
+       //съесть сыр
+       if (map[enemy_person->y][enemy_person->x] == '*') {
+            cheese_list[0].activ = false;
+       }
     }
     
     mvaddch(enemy_person->last_y, enemy_person->last_x, ' '); //clear last position
@@ -257,18 +269,6 @@ void get_random_xy_in_void_place(char **map, int rows, int cols, int *x, int *y)
 }
 
 
-void spawn_cheese(char **map, int number, int rows, int cols)
-{
-    int r_x, r_y;
-    for (int i = 0; i < number; i++) {
-        get_random_xy_in_void_place(map, rows, cols, &r_x, &r_y);
-        
-        map[r_y][r_x] = '*';
-    }
-
-}
-
-
 void release_map(char **map, int rows, int cols, struct player *my_player,
 struct player *enemy_list, struct cheese *cheese_list,
 int enemy_number, int balls_to_next_lvl)
@@ -285,6 +285,7 @@ int enemy_number, int balls_to_next_lvl)
     {
         int r_x, r_y;
         get_random_xy_in_void_place(map, rows, cols, &r_x, &r_y);
+        cheese_list[i].activ = true;
         cheese_list[i].x = r_x;
         cheese_list[i].y = r_y;
         map[cheese_list[i].y][cheese_list[i].x] = '*';
@@ -387,7 +388,10 @@ int main()
     
     
     
-    
+    //enemy_list[0].x = 5;
+    //enemy_list[0].y = 4;
+    //my_player.x = 55;
+    //my_player.y = 18;
     
     
     //Главный цикл
@@ -424,7 +428,7 @@ int main()
         //передвинуть противников
         bool out_cycle2 = false;
         for (int i = 0; i < enemy_number; i++) {
-            move_enemy(map, &enemy_list[i], my_player.x, my_player.y);
+            move_enemy(map, &enemy_list[i], cheese_list,  my_player.x, my_player.y);
             if ((out_cycle2 = fight_if_collision(map, my_player.x, my_player.y, enemy_list[i].x, enemy_list[i].y,
             rows, cols, my_player.role)) == true)
                 break;
