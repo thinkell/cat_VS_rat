@@ -11,6 +11,7 @@ struct player {
     int x, y;
     int last_x, last_y;
     char role;
+    int freeze_steps;
 };
 
 
@@ -96,7 +97,7 @@ void move_me(char **map, struct player *my_player, const int *my_key_input, int 
 }
 
 
-void calculate_coords_enemy(char **map, struct player *enemy_person, int px, int py, int role)
+void set_enemy_coords_for_move(char **map, struct player *enemy_person, int px, int py, int role)
 {
     /*role:
     1 - hunt (for cat)
@@ -116,10 +117,14 @@ void calculate_coords_enemy(char **map, struct player *enemy_person, int px, int
          map[enemy_person->y][(enemy_person->x)+1] == 'r') ? true : false;
     }
     else if (role == 2 || role == 3) {
-        up_not_board = (map[(enemy_person->y)-k_route][enemy_person->x] != '%') ? true : false;
-        down_not_board = (map[(enemy_person->y)+k_route][enemy_person->x] != '%') ? true : false;
-        left_not_board = (map[enemy_person->y][(enemy_person->x)-k_route] != '%') ? true : false;
-        right_not_board = (map[enemy_person->y][(enemy_person->x)+k_route] != '%') ? true : false;
+        up_not_board = (map[(enemy_person->y)-k_route][enemy_person->x] != '%' &&
+            map[(enemy_person->y)-k_route][enemy_person->x] != 'r') ? true : false;
+        down_not_board = (map[(enemy_person->y)+k_route][enemy_person->x] != '%' &&
+            map[(enemy_person->y)+k_route][enemy_person->x] != 'r') ? true : false;
+        left_not_board = (map[enemy_person->y][(enemy_person->x)-k_route] != '%' &&
+            map[enemy_person->y][(enemy_person->x)-k_route] != 'r') ? true : false;
+        right_not_board = (map[enemy_person->y][(enemy_person->x)+k_route] != '%' &&
+            map[enemy_person->y][(enemy_person->x)+k_route] != 'r') ? true : false;
     }
     
     
@@ -176,14 +181,14 @@ void calculate_coords_enemy(char **map, struct player *enemy_person, int px, int
 
 
 void move_enemy(char **map, struct player *enemy_person,
-struct cheese *cheese_list, int px, int py)
+struct cheese *cheese_list, int *eated_cheeses, int px, int py)
 {
     enemy_person->last_x = enemy_person->x, enemy_person->last_y = enemy_person->y;
     
     
     // для кота
     if (enemy_person->role == 'c') {
-        calculate_coords_enemy(map, enemy_person, px, py, 1);
+        set_enemy_coords_for_move(map, enemy_person, px, py, 1);
     }
     //для крысы
     else if (enemy_person->role == 'r') {
@@ -213,17 +218,19 @@ struct cheese *cheese_list, int px, int py)
         
        //определение куда идти: к сыру или от кота - в зависимости от расстояния
        //идти к сыру
-       if (near_cheese.distance_to_rat < near_cheese.distance_to_cat) {
-            calculate_coords_enemy(map, enemy_person, near_cheese.x, near_cheese.y, 3);
+       if (near_cheese.distance_to_rat <= near_cheese.distance_to_cat) {
+            set_enemy_coords_for_move(map, enemy_person, near_cheese.x, near_cheese.y, 3);
        }
        //уходить от кота
        else {
-            calculate_coords_enemy(map, enemy_person, px, py, 2);
+            set_enemy_coords_for_move(map, enemy_person, px, py, 2);
        }
        
        //съесть сыр
        if (map[enemy_person->y][enemy_person->x] == '*') {
             cheese_list[0].activ = false;
+            enemy_person->freeze_steps = (rand() % 3) + 1; //[1; 3]
+            (*eated_cheeses)++;
        }
     }
     
@@ -250,11 +257,11 @@ int rows, int cols, char my_role)
 }
 
 
-void print_output_panel(int lvl, int max_lvl, int balls, int balls_to_next_lvl,
+void print_output_panel(int lvl, int max_lvl, int balls, int cheeses_to_finish_lvl,
 int rows, int cols)
 {
     mvprintw(rows-1, 1, "lvl: %d/%d                         %d/%d",
-     lvl, max_lvl, balls, balls_to_next_lvl);
+     lvl, max_lvl, balls, cheeses_to_finish_lvl);
 
 }
 
@@ -271,7 +278,7 @@ void get_random_xy_in_void_place(char **map, int rows, int cols, int *x, int *y)
 
 void release_map(char **map, int rows, int cols, struct player *my_player,
 struct player *enemy_list, struct cheese *cheese_list,
-int enemy_number, int balls_to_next_lvl)
+int enemy_number, int cheeses_to_finish_lvl)
 {
     char enemy_role = ((my_player->role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
@@ -312,6 +319,11 @@ int enemy_number, int balls_to_next_lvl)
             //enemy_list[0].y = rand() % rows;
         } while (map[enemy_list[i].y][enemy_list[i].x] != ' ');
     }
+    
+    //изначально нулевая заморозка
+    my_player->freeze_steps = 0;
+    for (int i = 0; i < enemy_number; i++)
+        enemy_list[i].freeze_steps = 0;
 }
 
 
@@ -335,8 +347,8 @@ int main()
     //cтатистика
     int my_lvl = 1;
     int max_lvl = 10;
-    int my_balls = 0;
-    int balls_to_next_lvl = 5;
+    int eated_cheeses = 0;
+    int cheeses_to_finish_lvl = 5;
     //противники
     int enemy_number = 1;
     struct player enemy_list[10];//!!
@@ -378,7 +390,7 @@ int main()
     
     //создание карты
     release_map(map, rows, cols, &my_player,
-            enemy_list, cheese_list, enemy_number, balls_to_next_lvl);
+            enemy_list, cheese_list, enemy_number, cheeses_to_finish_lvl);
     
     
     
@@ -388,10 +400,6 @@ int main()
     
     
     
-    //enemy_list[0].x = 5;
-    //enemy_list[0].y = 4;
-    //my_player.x = 55;
-    //my_player.y = 18;
     
     
     //Главный цикл
@@ -399,12 +407,12 @@ int main()
         //переход на следующий уровень
         if (
          my_player.x == x_lvl_point && my_player.y == y_lvl_point
-         || my_balls == balls_to_next_lvl) {
+         || eated_cheeses == cheeses_to_finish_lvl) {
             my_lvl++;
             enemy_number++;
-            my_balls = 0;
+            eated_cheeses = 0;
             release_map(map, rows, cols, &my_player,
-            enemy_list, cheese_list, enemy_number, balls_to_next_lvl);
+            enemy_list, cheese_list, enemy_number, cheeses_to_finish_lvl);
             get_random_xy_in_void_place(map, rows, cols, &x_lvl_point, &y_lvl_point);            
          }
          
@@ -414,7 +422,7 @@ int main()
         
         //передвинуть меня
         bool out_cycle1 = false;
-        move_me(map, &my_player, &c, &my_balls);
+        move_me(map, &my_player, &c, &eated_cheeses);
         for (int i = 0; i < enemy_number; i++) {
             if ((out_cycle1 = fight_if_collision(map, my_player.x, my_player.y, enemy_list[i].x, enemy_list[i].y,
             rows, cols, my_player.role)) == true)
@@ -428,7 +436,12 @@ int main()
         //передвинуть противников
         bool out_cycle2 = false;
         for (int i = 0; i < enemy_number; i++) {
-            move_enemy(map, &enemy_list[i], cheese_list,  my_player.x, my_player.y);
+            //если заморозка
+            if (enemy_list[i].freeze_steps > 0) {
+                enemy_list[i].freeze_steps--;
+                continue;
+            }
+            move_enemy(map, &enemy_list[i], cheese_list, &eated_cheeses, my_player.x, my_player.y);
             if ((out_cycle2 = fight_if_collision(map, my_player.x, my_player.y, enemy_list[i].x, enemy_list[i].y,
             rows, cols, my_player.role)) == true)
                 break;
@@ -437,7 +450,7 @@ int main()
             break;
             
         //вывод статистики
-        print_output_panel(my_lvl, max_lvl, my_balls, balls_to_next_lvl, rows, cols);
+        print_output_panel(my_lvl, max_lvl, eated_cheeses, cheeses_to_finish_lvl, rows, cols);
         
         
         
