@@ -217,8 +217,12 @@ struct cheese *cheese_list, int *eated_cheeses, int px, int py)
         
         
        //определение куда идти: к сыру или от кота - в зависимости от расстояния
+       //дистанция к коту
+       double rat_distance_to_cat = hypot(enemy_person->x-px, enemy_person->y-py);
+       double safe_distance = (rand() % 10) + 3; //[3; 13)
        //идти к сыру
-       if (near_cheese.distance_to_rat <= near_cheese.distance_to_cat) {
+       if (near_cheese.distance_to_rat <= near_cheese.distance_to_cat ||
+        rat_distance_to_cat > safe_distance) {
             set_enemy_coords_for_move(map, enemy_person, near_cheese.x, near_cheese.y, 3);
        }
        //уходить от кота
