@@ -12,6 +12,7 @@ struct player {
     int last_x, last_y;
     char role;
     int freeze_steps;
+    bool activ;
 };
 
 
@@ -79,9 +80,9 @@ void move_me(char **map, struct player *my_player, const int *my_key_input, int 
         my_player->x++;
     
  
-    //если шаг на стену/границу - возвращение персонажа на исходную позицию
+    //если шаг на стену/границу/сыр - возвращение персонажа на исходную позицию
     if (map[my_player->y][my_player->x] == '%' || (my_player->role == 'c' &&
-     map[my_player->y][my_player->x] == '#')) {
+     map[my_player->y][my_player->x] == '#' || map[my_player->y][my_player->x] == '*')) {
         my_player->x = my_player->last_x;
         my_player->y = my_player->last_y;    
     } //только крыса может проедать стены(но не границы)
@@ -233,7 +234,7 @@ struct cheese *cheese_list, int *eated_cheeses, int px, int py)
        //съесть сыр
        if (map[enemy_person->y][enemy_person->x] == '*') {
             cheese_list[0].activ = false;
-            enemy_person->freeze_steps = (rand() % 3) + 1; //[1; 3]
+            enemy_person->freeze_steps = (rand() % 5) + 1; //[1; 5]
             (*eated_cheeses)++;
        }
     }
@@ -246,18 +247,33 @@ struct cheese *cheese_list, int *eated_cheeses, int px, int py)
 }
 
 
-bool fight_if_collision(char **map, int px, int py, int ex, int ey,
-int rows, int cols, char my_role)
+void game_over(char **map, int rows, int cols, const char *output_text)
 {
-    bool collision = (px == ex) && (py == ey);
-    if (collision) {
-        const char *end_text = (my_role == 'c') ? "win" : "lose";
-        clear_display(map, rows, cols);
-        mvprintw(rows/2, cols/2, "You %s\n", end_text);
-        getch();
+    clear_display(map, rows, cols);
+    mvprintw(rows/2, cols/2, "You %s\n", output_text);
+    getch();
+}
+
+
+bool fight_if_collision(char **map, int rows, int cols,
+struct player *my_player, struct player *enemy_person, int *eated_rats)
+{
+    bool collision_with_cat = (my_player->role == 'r') &&
+     (my_player->x == enemy_person->x) && (my_player->y == enemy_person->y);
+    bool collision_with_rat = (my_player->role == 'c') &&
+     (my_player->x == enemy_person->x) && (my_player->y == enemy_person->y) && 
+     (enemy_person->activ == true);
+     
+    if (collision_with_cat) {
+        game_over(map, rows, cols, "lose");
+    }
+    else if (collision_with_rat) {
+        (*eated_rats)++;
+        enemy_person->activ = false;
     }
     
-    return collision;
+    
+    return collision_with_cat;
 }
 
 
@@ -328,6 +344,9 @@ int enemy_number, int cheeses_to_finish_lvl)
     my_player->freeze_steps = 0;
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].freeze_steps = 0;
+        
+    for (int i = 0; i < enemy_number; i++)
+        enemy_list[i].activ = true;
 }
 
 
@@ -353,6 +372,8 @@ int main()
     int max_lvl = 10;
     int eated_cheeses = 0;
     int cheeses_to_finish_lvl = 5;
+    int eated_rats = 0;
+    int rats_to_finish_lvl = my_lvl;
     //противники
     int enemy_number = 1;
     struct player enemy_list[10];//!!
@@ -390,6 +411,9 @@ int main()
     char enemy_role = ((my_player.role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].role = enemy_role;
+        
+    for (int i = 0; i < enemy_number; i++)
+        enemy_list[i].activ = true;
     
     
     //создание карты
@@ -409,16 +433,28 @@ int main()
     //Главный цикл
     do {
         //переход на следующий уровень
-        if (
-         my_player.x == x_lvl_point && my_player.y == y_lvl_point
-         || eated_cheeses == cheeses_to_finish_lvl) {
+        if ((my_player.x == x_lvl_point && my_player.y == y_lvl_point)//!!!s
+         && ((my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl)
+         || (my_player.role == 'c' && eated_rats == rats_to_finish_lvl))) {
             my_lvl++;
             enemy_number++;
             eated_cheeses = 0;
+            eated_rats = 0;
+            rats_to_finish_lvl = my_lvl;
             release_map(map, rows, cols, &my_player,
             enemy_list, cheese_list, enemy_number, cheeses_to_finish_lvl);
             get_random_xy_in_void_place(map, rows, cols, &x_lvl_point, &y_lvl_point);            
          }
+         
+         if (my_player.role == 'c' && eated_cheeses == cheeses_to_finish_lvl) {
+            game_over(map, rows, cols, "lose");
+            return 0;
+         }
+         else if (my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl) {
+            game_over(map, rows, cols, "win");
+            return 0;
+         }
+         
          
         //прорисовка точки "следующий уровень" - >
         mvaddch(y_lvl_point, x_lvl_point, '>');
@@ -428,8 +464,8 @@ int main()
         bool out_cycle1 = false;
         move_me(map, &my_player, &c, &eated_cheeses);
         for (int i = 0; i < enemy_number; i++) {
-            if ((out_cycle1 = fight_if_collision(map, my_player.x, my_player.y, enemy_list[i].x, enemy_list[i].y,
-            rows, cols, my_player.role)) == true)
+            if ((out_cycle1 = fight_if_collision(map, rows, cols,
+            &my_player, &enemy_list[i], &eated_rats)) == true)
                 break;
         }
         if (out_cycle1 == true)
@@ -440,14 +476,17 @@ int main()
         //передвинуть противников
         bool out_cycle2 = false;
         for (int i = 0; i < enemy_number; i++) {
+            //если откл.
+            if (enemy_list[i].activ == false)
+                continue;
             //если заморозка
             if (enemy_list[i].freeze_steps > 0) {
                 enemy_list[i].freeze_steps--;
                 continue;
             }
             move_enemy(map, &enemy_list[i], cheese_list, &eated_cheeses, my_player.x, my_player.y);
-            if ((out_cycle2 = fight_if_collision(map, my_player.x, my_player.y, enemy_list[i].x, enemy_list[i].y,
-            rows, cols, my_player.role)) == true)
+            if ((out_cycle2 = fight_if_collision(map, rows, cols,
+            &my_player, &enemy_list[i], &eated_rats)) == true)
                 break;
         }
         if (out_cycle2 == true)
