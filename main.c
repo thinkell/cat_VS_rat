@@ -252,7 +252,9 @@ struct cheese *cheese_list, int *eated_cheeses, int my_lvl, int px, int py)
        //съесть сыр
        if (map[enemy_person->y][enemy_person->x] == '*') {
             cheese_list[0].activ = false;
-            enemy_person->freeze_steps = (rand() % 5) + 1; //[1; 5]
+            int random_number = (my_lvl == 1) ? (rand() % 3) : (rand() % 8); //[0; 3) : [0; 8)
+            enemy_person->freeze_steps = (rand() % 
+                (int)rat_distance_to_cat+random_number) + 0; //[0; rat_distance_to_cat+random_number]
             (*eated_cheeses)++;
        }
     }
@@ -340,24 +342,12 @@ int enemy_number, int cheeses_to_finish_lvl, int my_lvl)
     
     print_map(map, rows, cols);
     
-    //спавн    
-    do {
-    
-         my_player->x = (rand() % (cols / 3)) + 1; //[1; (cols / 3)]
-         my_player->y = (rand() % (rows / 3)) + 1; //[1; (rows / 3)]
-         //my_player->x = rand() % cols;
-         //my_player->y = rand() % rows;
-    } while (map[my_player->y][my_player->x] != ' ');
-    map[my_player->y][my_player->x] = my_player->role;
+    //спавн
+    get_random_xy_in_void_place(map, rows, cols, &my_player->x, &my_player->y);
     
     
     for (int i = 0; i < enemy_number; i++) {
-        do {
-            enemy_list[i].x = (rand() % (cols / 3)) + 1; //[1; (cols / 3)]
-            enemy_list[i].y = (rand() % (rows / 3)) + 1; //[1; (rows / 3)]
-            //enemy_list[0].x = rand() % cols;
-            //enemy_list[0].y = rand() % rows;
-        } while (map[enemy_list[i].y][enemy_list[i].x] != ' ');
+        get_random_xy_in_void_place(map, rows, cols, &enemy_list[i].x, &enemy_list[i].y);
     }
     
     //изначально нулевая заморозка
@@ -465,7 +455,7 @@ int main()
             
         //переход на следующий уровень
         if ((my_player.x == x_lvl_point && my_player.y == y_lvl_point)
-         || ((my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl)
+         && ((my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl)
          || (my_player.role == 'c' && eated_rats == rats_to_finish_lvl))) {
             my_lvl++;
             enemy_number++;
