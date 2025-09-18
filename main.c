@@ -73,7 +73,8 @@ void clear_display(char **map, int rows, int cols)
 }
 
 
-void move_me(char **map, struct player *my_player, const int *my_key_input, int *my_cheese)
+void move_me(char **map, struct player *my_player,
+struct player *enemy_list, int enemy_number, int my_lvl, const int *my_key_input, int *my_cheese)
 {
     my_player->last_x = my_player->x, my_player->last_y = my_player->y;
     if (*my_key_input == KEY_UP)
@@ -94,8 +95,13 @@ void move_me(char **map, struct player *my_player, const int *my_key_input, int 
     } //только крыса может проедать стены(но не границы)
     
     //съесть сыр
-    if (map[my_player->y][my_player->x] == '*')
+    if (map[my_player->y][my_player->x] == '*') {
+        //заморозка котов
+        for (int i = 0; i < enemy_number; i++) {
+            enemy_list[i].freeze_steps = (rand() % my_lvl) + 1; //[1; my_lvl]
+        }
         (*my_cheese)++;
+    }    
     
     mvaddch(my_player->last_y, my_player->last_x, ' '); //clear last position
     map[my_player->last_y][my_player->last_x] = ' ';
@@ -485,7 +491,7 @@ int main()
         
         //передвинуть меня
         bool out_cycle1 = false;
-        move_me(map, &my_player, &c, &eated_cheeses);
+        move_me(map, &my_player, enemy_list, enemy_number, my_lvl, &c, &eated_cheeses);
         for (int i = 0; i < enemy_number; i++) {
             if ((out_cycle1 = fight_if_collision(map, rows, cols,
             &my_player, &enemy_list[i], &eated_rats)) == true)
