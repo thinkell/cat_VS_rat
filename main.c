@@ -98,7 +98,9 @@ struct player *enemy_list, int enemy_number, int my_lvl, const int *my_key_input
     if (map[my_player->y][my_player->x] == '*') {
         //заморозка котов
         for (int i = 0; i < enemy_number; i++) {
-            enemy_list[i].freeze_steps = (rand() % my_lvl) + 1; //[1; my_lvl]
+            
+            enemy_list[i].freeze_steps += (my_lvl == 1) ? ((rand() % 4) + 1) :
+                ((rand() % my_lvl+7) + 1); //[1; 4] : [1; my_lvl+7]
         }
         (*my_cheese)++;
     }    
@@ -258,7 +260,7 @@ struct cheese *cheese_list, int *eated_cheeses, int my_lvl, int px, int py)
        //съесть сыр
        if (map[enemy_person->y][enemy_person->x] == '*') {
             cheese_list[0].activ = false;
-            int random_number = (my_lvl == 1) ? (rand() % 3) : (rand() % 8); //[0; 3) : [0; 8)
+            int random_number = (my_lvl == 1) ? (rand() % 4) : (rand() % 9); //[0; 4) : [0; 9)
             enemy_person->freeze_steps = (rand() % 
                 (int)rat_distance_to_cat+random_number) + 0; //[0; rat_distance_to_cat+random_number]
             (*eated_cheeses)++;
@@ -370,42 +372,45 @@ int enemy_number, int cheeses_to_finish_lvl, int my_lvl)
 
 int main()
 {
-    //init
+    //init set
     initscr();
-    //set
     keypad(stdscr, 1);
     noecho();
     curs_set(0);
+    
     //seed
     srand(time(NULL));
     
     
-    //переменные моего персонажа
+    
+    //key input
     int c = 0;
+    //my player object
     struct player my_player;
-    //cтатистика
+    //lvl and cheese variables
     int my_lvl = 1;
     int max_lvl = 10;
     int eated_cheeses = 0;
     int cheeses_to_finish_lvl = NUMBER_CHEESES_FOR_RAT*my_lvl;
     int eated_rats = 0;
     int rats_to_finish_lvl = my_lvl;
-    //противники
+    //start number of enemies
     int enemy_number = 1;
+    //objects for enemies
     struct player enemy_list[10];//!!
-    //сыр
+    //objects for cheeses
     struct cheese cheese_list[NUMBER_CHEESES_FOR_RAT*MAX_LVL];
-    //инициализация сыров
+    //disable all cheeses active
     for (int i = 0; i < NUMBER_CHEESES_FOR_RAT*MAX_LVL; i++)
         cheese_list[i].activ = false;
     
     
     
-    //масштаб карты
+    //for map scale get terminal scale = cross-platform game
     int cols, rows;
-    getmaxyx(stdscr, rows, cols); //для кроссплатф.
+    getmaxyx(stdscr, rows, cols);
     
-    //карта(база данных) - динамический двумерный массив
+    //карта(база данных) - динамический двумерный массив. Map base create and set
     char **map = (char**)malloc(rows * sizeof(int*));
     if (map == NULL) {
         return 0;
@@ -419,29 +424,28 @@ int main()
     
     
     
-    //выбор персонажа: кот или крыса
+    //choice role for user: cat or rat
     mvprintw(rows/2, cols/2, "Press key\n'1' - cat\n'2' - rat\n");
-    
     c = getch();
+    my_player.role = ((c == '1') ? 'c' : 'r');
     
-    my_player.role = ((c == '1') ? 'c' : 'r');///*
     
-    //назначение роли противникам(которая противоположна роли игрока)
+    //set role enemies !!!можно сразу поставить роль всем в массиве ИЛИ вообще принебречь универсальностью
     char enemy_role = ((my_player.role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].role = enemy_role;
-        
+    //enable active enemies
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].activ = true;
     
     
-    //создание карты
+    //release map
     release_map(map, rows, cols, &my_player,
             enemy_list, cheese_list, enemy_number, cheeses_to_finish_lvl, my_lvl);
     
     
     
-    //точка "следующий уровень" - >
+    //point "next level"
     int x_lvl_point, y_lvl_point;
     get_random_xy_in_void_place(map, rows, cols, &x_lvl_point, &y_lvl_point);
     
@@ -449,7 +453,7 @@ int main()
     
     
     
-    //Главный цикл
+    //game loop
     do {
         //game over
         if (my_lvl == max_lvl)
@@ -459,7 +463,7 @@ int main()
                 break;
             }
             
-        //переход на следующий уровень
+        //switch to next level
         if ((my_player.x == x_lvl_point && my_player.y == y_lvl_point)
          && ((my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl)
          || (my_player.role == 'c' && eated_rats == rats_to_finish_lvl))) {
@@ -474,19 +478,19 @@ int main()
             enemy_list, cheese_list, enemy_number, cheeses_to_finish_lvl, my_lvl);
             get_random_xy_in_void_place(map, rows, cols, &x_lvl_point, &y_lvl_point);            
          }
-         
+         //game over
          if (my_player.role == 'c' && eated_cheeses == cheeses_to_finish_lvl) {
             game_over(map, rows, cols, "lose");
             break;
          }
          
-         
-                
                 
          
          
-        //прорисовка точки "следующий уровень" - >
+        //прорисовка точки "next level" - >
         mvaddch(y_lvl_point, x_lvl_point, '>');
+        
+        
         
         
         //передвинуть меня
@@ -499,7 +503,7 @@ int main()
         }
         if (out_cycle1 == true)
             break;
-        
+         
          
         
         //передвинуть противников
@@ -521,20 +525,24 @@ int main()
         if (out_cycle2 == true)
             break;
             
-        //вывод статистики
+            
+            
+            
+        //print output panel - stats info
         print_output_panel(my_lvl, max_lvl, eated_cheeses, cheeses_to_finish_lvl, rows, cols);
-        
-        
-        
+         
     } while ((c = getch()) && c != 'q' && c != 27); //27 - ESC
     
         
         
         
         
+        
+    //free memory
     for (int i = 0; i < rows; i++) 
         free(map[i]);
     free(map);
+    //end
     endwin();
     return 0;
 }
