@@ -6,8 +6,9 @@
 #include <ncurses.h>
 
 
-#define MAX_LVL                     10
+#define MAX_LVL                     5
 #define NUMBER_CHEESES_FOR_RAT      5
+#define MAX_ENEMIES_NUMBER          10
 
 
 
@@ -70,6 +71,38 @@ void clear_display(char **map, int rows, int cols)
             mvaddch(y, x, ' ');
             map[y][x] = ' ';
         }
+}
+
+
+double round_number(double number)
+{
+    return (int)(number*100 + 0.5) / 100.0;
+}
+
+
+double get_sqrt(double x)
+{
+    double guess = 0;
+    int count = 0;
+       
+    while (round_number(guess*guess) != round_number(x))
+    {
+        count++;
+        if (count == 1) {
+            guess = x / 2.0;
+            continue;
+        }
+        
+        guess = (guess + x/guess) / 2.0;    
+    }
+    
+    return guess;
+}
+
+
+double get_distance_to_point(double dx, double dy)
+{
+    return get_sqrt(dx*dx + dy*dy);
 }
 
 
@@ -144,10 +177,10 @@ void set_enemy_coords_for_move(char **map, struct player *enemy_person, int px, 
     
     
     
-    double up_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)-1));
-    double down_distance_to_rat = hypot(px-(enemy_person->x), py-((enemy_person->y)+1));
-    double left_distance_to_rat = hypot(px-((enemy_person->x)-1), py-(enemy_person->y));
-    double right_distance_to_rat = hypot(px-((enemy_person->x)+1), py-(enemy_person->y));
+    double up_distance_to_rat = get_distance_to_point(px-(enemy_person->x), py-((enemy_person->y)-1));
+    double down_distance_to_rat = get_distance_to_point(px-(enemy_person->x), py-((enemy_person->y)+1));
+    double left_distance_to_rat = get_distance_to_point(px-((enemy_person->x)-1), py-(enemy_person->y));
+    double right_distance_to_rat = get_distance_to_point(px-((enemy_person->x)+1), py-(enemy_person->y));
 
     //усл. вверх
     bool up_less_down = (down_not_board == true) ?
@@ -211,8 +244,8 @@ struct cheese *cheese_list, int *eated_cheeses, int my_lvl, int px, int py)
         for (int i = 0; i < NUMBER_CHEESES_FOR_RAT*my_lvl; i++) {
             int ch_x = cheese_list[i].x;
             int ch_y = cheese_list[i].y;
-            cheese_list[i].distance_to_rat = hypot(ch_x-enemy_person->x, ch_y-enemy_person->y);
-            cheese_list[i].distance_to_cat = hypot(ch_x-px, ch_y-py);
+            cheese_list[i].distance_to_rat = get_distance_to_point(ch_x-enemy_person->x, ch_y-enemy_person->y);
+            cheese_list[i].distance_to_cat = get_distance_to_point(ch_x-px, ch_y-py);
         }
         //сыр с минимальным расстоянием до крысы
         //сортировка массива по активу
@@ -245,7 +278,7 @@ struct cheese *cheese_list, int *eated_cheeses, int my_lvl, int px, int py)
         
        //определение куда идти: к сыру или от кота - в зависимости от расстояния
        //дистанция к коту
-       double rat_distance_to_cat = hypot(enemy_person->x-px, enemy_person->y-py);
+       double rat_distance_to_cat = get_distance_to_point(enemy_person->x-px, enemy_person->y-py);
        double safe_distance = (rand() % 10) + 3; //[3; 13)
        //идти к сыру
        if (near_cheese.distance_to_rat <= near_cheese.distance_to_cat ||
@@ -305,11 +338,11 @@ struct player *my_player, struct player *enemy_person, int *eated_rats)
 }
 
 
-void print_output_panel(int lvl, int max_lvl, int balls, int cheeses_to_finish_lvl,
+void print_output_panel(int lvl, int balls, int cheeses_to_finish_lvl,
 int rows, int cols)
 {
     mvprintw(rows-1, 1, "lvl: %d/%d                         %d/%d",
-     lvl, max_lvl, balls, cheeses_to_finish_lvl);
+     lvl, MAX_LVL, balls, cheeses_to_finish_lvl);
 
 }
 
@@ -389,7 +422,6 @@ int main()
     struct player my_player;
     //lvl and cheese variables
     int my_lvl = 1;
-    int max_lvl = 10;
     int eated_cheeses = 0;
     int cheeses_to_finish_lvl = NUMBER_CHEESES_FOR_RAT*my_lvl;
     int eated_rats = 0;
@@ -397,7 +429,7 @@ int main()
     //start number of enemies
     int enemy_number = 1;
     //objects for enemies
-    struct player enemy_list[10];//!!
+    struct player enemy_list[MAX_ENEMIES_NUMBER];
     //objects for cheeses
     struct cheese cheese_list[NUMBER_CHEESES_FOR_RAT*MAX_LVL];
     //disable all cheeses active
@@ -430,7 +462,7 @@ int main()
     my_player.role = ((c == '1') ? 'c' : 'r');
     
     
-    //set role enemies !!!можно сразу поставить роль всем в массиве ИЛИ вообще принебречь универсальностью
+    //set role enemies
     char enemy_role = ((my_player.role == 'c') ? 'r' : 'c');
     for (int i = 0; i < enemy_number; i++)
         enemy_list[i].role = enemy_role;
@@ -456,7 +488,7 @@ int main()
     //game loop
     do {
         //game over
-        if (my_lvl == max_lvl)
+        if (my_lvl == MAX_LVL)
             if ((my_player.role == 'r' && eated_cheeses == cheeses_to_finish_lvl) ||
             (my_player.role == 'c' && eated_rats == rats_to_finish_lvl)) {
                 game_over(map, rows, cols, "win");
@@ -529,7 +561,7 @@ int main()
             
             
         //print output panel - stats info
-        print_output_panel(my_lvl, max_lvl, eated_cheeses, cheeses_to_finish_lvl, rows, cols);
+        print_output_panel(my_lvl, eated_cheeses, cheeses_to_finish_lvl, rows, cols);
          
     } while ((c = getch()) && c != 'q' && c != 27); //27 - ESC
     
